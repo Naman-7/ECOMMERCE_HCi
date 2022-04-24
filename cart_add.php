@@ -1,65 +1,35 @@
 <?php
 	include 'includes/session.php';
 
-	$conn = $pdo->open();
+	if(isset($_POST['add'])){
+		$id = $_POST['id'];
+		$product = $_POST['product'];
+		$quantity = $_POST['quantity'];
 
-	$output = array('error'=>false);
+		$conn = $pdo->open();
 
-	$id = $_POST['id'];
-	$quantity = $_POST['quantity'];
-
-	if(isset($_SESSION['user'])){
-		$stmt = $conn->prepare("SELECT *, COUNT(*) AS numrows FROM cart WHERE user_id=:user_id AND product_id=:product_id");
-		$stmt->execute(['user_id'=>$user['id'], 'product_id'=>$id]);
+		$stmt = $conn->prepare("SELECT *, COUNT(*) AS numrows FROM cart WHERE product_id=:id");
+		$stmt->execute(['id'=>$product]);
 		$row = $stmt->fetch();
-		if($row['numrows'] < 1){
+
+		if($row['numrows'] > 0){
+			$_SESSION['error'] = 'Product exist in cart';
+		}
+		else{
 			try{
-				$stmt = $conn->prepare("INSERT INTO cart (user_id, product_id, quantity) VALUES (:user_id, :product_id, :quantity)");
-				$stmt->execute(['user_id'=>$user['id'], 'product_id'=>$id, 'quantity'=>$quantity]);
-				$output['message'] = 'Item added to cart';
-				
+				$stmt = $conn->prepare("INSERT INTO cart (user_id, product_id, quantity) VALUES (:user, :product, :quantity)");
+				$stmt->execute(['user'=>$id, 'product'=>$product, 'quantity'=>$quantity]);
+
+				$_SESSION['success'] = 'Product added to cart';
 			}
 			catch(PDOException $e){
-				$output['error'] = true;
-				$output['message'] = $e->getMessage();
+				$_SESSION['error'] = $e->getMessage();
 			}
 		}
-		else{
-			$output['error'] = true;
-			$output['message'] = 'Product already in cart';
-		}
+
+		$pdo->close();
+
+		header('location: cart.php?user='.$id);
 	}
-	else{
-		if(!isset($_SESSION['cart'])){
-			$_SESSION['cart'] = array();
-		}
-
-		$exist = array();
-
-		foreach($_SESSION['cart'] as $row){
-			array_push($exist, $row['productid']);
-		}
-
-		if(in_array($id, $exist)){
-			$output['error'] = true;
-			$output['message'] = 'Product already in cart';
-		}
-		else{
-			$data['productid'] = $id;
-			$data['quantity'] = $quantity;
-
-			if(array_push($_SESSION['cart'], $data)){
-				$output['message'] = 'Item added to cart';
-			}
-			else{
-				$output['error'] = true;
-				$output['message'] = 'Cannot add item to cart';
-			}
-		}
-
-	}
-
-	$pdo->close();
-	echo json_encode($output);
 
 ?>
